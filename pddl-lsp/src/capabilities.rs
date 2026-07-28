@@ -1,11 +1,8 @@
 use lsp_max::lsp_types_max::ServerCapabilities;
-use serde_json::json;
+use serde_json::{json, Value};
 
-/// Build the entire LSP 3.18 server-capability surface. The lsp-max router owns
-/// transport/lifecycle coverage; PDDL-specific handlers override the routes with
-/// semantic behavior while all remaining routes retain lawful framework defaults.
-pub fn server_capabilities() -> ServerCapabilities {
-    let value = json!({
+fn capability_value() -> Value {
+    json!({
         "positionEncoding": "utf-16",
         "textDocumentSync": {"openClose": true, "change": 2, "willSave": true, "willSaveWaitUntil": true, "save": {"includeText": true}},
         "selectionRangeProvider": true,
@@ -64,13 +61,32 @@ pub fn server_capabilities() -> ServerCapabilities {
             "lsif": {"version": "0.6.0", "completeVocabulary": true},
             "ggen": {"ontology": "ontology/pddl-lsp.ttl", "config": "ggen.toml"}
         }
-    });
-    serde_json::from_value(value).expect("static LSP 3.18 capability manifest must deserialize")
+    })
+}
+
+/// Build the entire LSP 3.18 server-capability surface. The lsp-max router owns
+/// transport/lifecycle coverage; PDDL-specific handlers override the routes with
+/// semantic behavior while all remaining routes retain lawful framework defaults.
+pub fn server_capabilities() -> ServerCapabilities {
+    serde_json::from_value(capability_value())
+        .expect("static LSP 3.18 capability manifest must deserialize")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_capability_field_deserializes() {
+        let Value::Object(fields) = capability_value() else {
+            panic!("capability manifest must be an object");
+        };
+        for (name, value) in fields {
+            let probe = json!({ name.clone(): value });
+            serde_json::from_value::<ServerCapabilities>(probe)
+                .unwrap_or_else(|error| panic!("capability field {name} failed: {error}"));
+        }
+    }
 
     #[test]
     fn full_capability_manifest_deserializes() {
