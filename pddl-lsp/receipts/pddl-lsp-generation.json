@@ -1,0 +1,12 @@
+{
+  "artifact": "src/generated/capability_manifest.rs",
+  "artifact_sha256": "b6b321d7e2e1978ffb57891c0c14f828ba6615f49c8ca20c20ff1abf91369a36",
+  "generator": "ggen ontology projection independent verifier",
+  "hash_algorithm": "SHA-256",
+  "lsif_edges": 21,
+  "lsif_vertices": 24,
+  "lsp_methods": 73,
+  "source": "ontology/pddl-lsp.ttl",
+  "source_sha256": "f491addb342d5884b5fe0aa477ee6ddaec1b950d4de6b176f9d1c80b49f2ee3c",
+  "status": "PARTIAL_ALIVE"
+}
