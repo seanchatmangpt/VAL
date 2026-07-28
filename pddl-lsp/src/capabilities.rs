@@ -56,7 +56,7 @@ pub fn server_capabilities() -> ServerCapabilities {
         "inlineValueProvider": true,
         "inlayHintProvider": {"resolveProvider": true},
         "diagnosticProvider": {"identifier": "val-pddl", "interFileDependencies": true, "workspaceDiagnostics": true},
-        "textDocumentContentProvider": {},
+        "textDocumentContentProvider": {"schemes": ["file", "untitled"]},
         "inlineCompletionProvider": true,
         "experimental": {
             "pddl": {"dialects": ["PDDL 1.2", "PDDL 2.1", "PDDL 2.2", "PDDL 3.0", "PDDL 3.1", "HDDL"], "validator": "VAL"},
