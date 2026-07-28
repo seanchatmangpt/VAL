@@ -1,0 +1,138 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix lsp: <https://lsp-max.rs/ontology/> .
+@prefix lsif: <https://lsp-max.rs/ontology/lsif/> .
+@prefix law: <https://lsp-max.rs/law/> .
+@prefix pddl: <https://val-tools.github.io/pddl-lsp/> .
+
+pddl:ontology a owl:Ontology ;
+  rdfs:label "VAL PDDL LSP manufacturing ontology" ;
+  owl:imports <https://lsp-max.rs/ontology/> ;
+  rdfs:comment "Source of truth for LSP 3.18 routing and LSIF 0.6 emission." .
+
+pddl:LspMethod a owl:Class .
+pddl:LsifVertex a owl:Class .
+pddl:LsifEdge a owl:Class .
+lsp:methodName a owl:DatatypeProperty ; rdfs:range xsd:string .
+law:status a owl:ObjectProperty .
+law:WIRED a owl:NamedIndividual .
+pddl:lsp_000 a pddl:LspMethod ; lsp:methodName "initialize" ; law:status law:CANDIDATE .
+pddl:lsp_001 a pddl:LspMethod ; lsp:methodName "initialized" ; law:status law:CANDIDATE .
+pddl:lsp_002 a pddl:LspMethod ; lsp:methodName "shutdown" ; law:status law:CANDIDATE .
+pddl:lsp_003 a pddl:LspMethod ; lsp:methodName "textDocument/didOpen" ; law:status law:CANDIDATE .
+pddl:lsp_004 a pddl:LspMethod ; lsp:methodName "textDocument/didChange" ; law:status law:CANDIDATE .
+pddl:lsp_005 a pddl:LspMethod ; lsp:methodName "textDocument/willSave" ; law:status law:WIRED .
+pddl:lsp_006 a pddl:LspMethod ; lsp:methodName "textDocument/willSaveWaitUntil" ; law:status law:WIRED .
+pddl:lsp_007 a pddl:LspMethod ; lsp:methodName "textDocument/didSave" ; law:status law:WIRED .
+pddl:lsp_008 a pddl:LspMethod ; lsp:methodName "textDocument/didClose" ; law:status law:CANDIDATE .
+pddl:lsp_009 a pddl:LspMethod ; lsp:methodName "textDocument/declaration" ; law:status law:WIRED .
+pddl:lsp_010 a pddl:LspMethod ; lsp:methodName "textDocument/definition" ; law:status law:CANDIDATE .
+pddl:lsp_011 a pddl:LspMethod ; lsp:methodName "textDocument/typeDefinition" ; law:status law:WIRED .
+pddl:lsp_012 a pddl:LspMethod ; lsp:methodName "textDocument/implementation" ; law:status law:WIRED .
+pddl:lsp_013 a pddl:LspMethod ; lsp:methodName "textDocument/references" ; law:status law:CANDIDATE .
+pddl:lsp_014 a pddl:LspMethod ; lsp:methodName "textDocument/prepareCallHierarchy" ; law:status law:WIRED .
+pddl:lsp_015 a pddl:LspMethod ; lsp:methodName "callHierarchy/incomingCalls" ; law:status law:WIRED .
+pddl:lsp_016 a pddl:LspMethod ; lsp:methodName "callHierarchy/outgoingCalls" ; law:status law:WIRED .
+pddl:lsp_017 a pddl:LspMethod ; lsp:methodName "textDocument/prepareTypeHierarchy" ; law:status law:WIRED .
+pddl:lsp_018 a pddl:LspMethod ; lsp:methodName "typeHierarchy/supertypes" ; law:status law:WIRED .
+pddl:lsp_019 a pddl:LspMethod ; lsp:methodName "typeHierarchy/subtypes" ; law:status law:WIRED .
+pddl:lsp_020 a pddl:LspMethod ; lsp:methodName "textDocument/documentHighlight" ; law:status law:CANDIDATE .
+pddl:lsp_021 a pddl:LspMethod ; lsp:methodName "textDocument/documentLink" ; law:status law:WIRED .
+pddl:lsp_022 a pddl:LspMethod ; lsp:methodName "documentLink/resolve" ; law:status law:WIRED .
+pddl:lsp_023 a pddl:LspMethod ; lsp:methodName "textDocument/hover" ; law:status law:CANDIDATE .
+pddl:lsp_024 a pddl:LspMethod ; lsp:methodName "textDocument/codeLens" ; law:status law:WIRED .
+pddl:lsp_025 a pddl:LspMethod ; lsp:methodName "codeLens/resolve" ; law:status law:WIRED .
+pddl:lsp_026 a pddl:LspMethod ; lsp:methodName "textDocument/foldingRange" ; law:status law:CANDIDATE .
+pddl:lsp_027 a pddl:LspMethod ; lsp:methodName "textDocument/selectionRange" ; law:status law:WIRED .
+pddl:lsp_028 a pddl:LspMethod ; lsp:methodName "textDocument/documentSymbol" ; law:status law:CANDIDATE .
+pddl:lsp_029 a pddl:LspMethod ; lsp:methodName "textDocument/documentColor" ; law:status law:WIRED .
+pddl:lsp_030 a pddl:LspMethod ; lsp:methodName "textDocument/colorPresentation" ; law:status law:WIRED .
+pddl:lsp_031 a pddl:LspMethod ; lsp:methodName "textDocument/linkedEditingRange" ; law:status law:WIRED .
+pddl:lsp_032 a pddl:LspMethod ; lsp:methodName "textDocument/moniker" ; law:status law:WIRED .
+pddl:lsp_033 a pddl:LspMethod ; lsp:methodName "textDocument/completion" ; law:status law:CANDIDATE .
+pddl:lsp_034 a pddl:LspMethod ; lsp:methodName "completionItem/resolve" ; law:status law:WIRED .
+pddl:lsp_035 a pddl:LspMethod ; lsp:methodName "textDocument/signatureHelp" ; law:status law:WIRED .
+pddl:lsp_036 a pddl:LspMethod ; lsp:methodName "textDocument/codeAction" ; law:status law:WIRED .
+pddl:lsp_037 a pddl:LspMethod ; lsp:methodName "codeAction/resolve" ; law:status law:WIRED .
+pddl:lsp_038 a pddl:LspMethod ; lsp:methodName "textDocument/rename" ; law:status law:WIRED .
+pddl:lsp_039 a pddl:LspMethod ; lsp:methodName "textDocument/prepareRename" ; law:status law:WIRED .
+pddl:lsp_040 a pddl:LspMethod ; lsp:methodName "textDocument/formatting" ; law:status law:CANDIDATE .
+pddl:lsp_041 a pddl:LspMethod ; lsp:methodName "textDocument/rangeFormatting" ; law:status law:WIRED .
+pddl:lsp_042 a pddl:LspMethod ; lsp:methodName "textDocument/rangesFormatting" ; law:status law:WIRED .
+pddl:lsp_043 a pddl:LspMethod ; lsp:methodName "textDocument/onTypeFormatting" ; law:status law:WIRED .
+pddl:lsp_044 a pddl:LspMethod ; lsp:methodName "workspace/symbol" ; law:status law:WIRED .
+pddl:lsp_045 a pddl:LspMethod ; lsp:methodName "workspaceSymbol/resolve" ; law:status law:WIRED .
+pddl:lsp_046 a pddl:LspMethod ; lsp:methodName "workspace/executeCommand" ; law:status law:CANDIDATE .
+pddl:lsp_047 a pddl:LspMethod ; lsp:methodName "workspace/didChangeConfiguration" ; law:status law:WIRED .
+pddl:lsp_048 a pddl:LspMethod ; lsp:methodName "workspace/didChangeWatchedFiles" ; law:status law:WIRED .
+pddl:lsp_049 a pddl:LspMethod ; lsp:methodName "workspace/didChangeWorkspaceFolders" ; law:status law:WIRED .
+pddl:lsp_050 a pddl:LspMethod ; lsp:methodName "workspace/willCreateFiles" ; law:status law:WIRED .
+pddl:lsp_051 a pddl:LspMethod ; lsp:methodName "workspace/willRenameFiles" ; law:status law:WIRED .
+pddl:lsp_052 a pddl:LspMethod ; lsp:methodName "workspace/willDeleteFiles" ; law:status law:WIRED .
+pddl:lsp_053 a pddl:LspMethod ; lsp:methodName "workspace/didCreateFiles" ; law:status law:WIRED .
+pddl:lsp_054 a pddl:LspMethod ; lsp:methodName "workspace/didRenameFiles" ; law:status law:WIRED .
+pddl:lsp_055 a pddl:LspMethod ; lsp:methodName "workspace/didDeleteFiles" ; law:status law:WIRED .
+pddl:lsp_056 a pddl:LspMethod ; lsp:methodName "workspace/textDocumentContent" ; law:status law:WIRED .
+pddl:lsp_057 a pddl:LspMethod ; lsp:methodName "textDocument/semanticTokens/full" ; law:status law:CANDIDATE .
+pddl:lsp_058 a pddl:LspMethod ; lsp:methodName "textDocument/semanticTokens/full/delta" ; law:status law:WIRED .
+pddl:lsp_059 a pddl:LspMethod ; lsp:methodName "textDocument/semanticTokens/range" ; law:status law:WIRED .
+pddl:lsp_060 a pddl:LspMethod ; lsp:methodName "textDocument/inlayHint" ; law:status law:WIRED .
+pddl:lsp_061 a pddl:LspMethod ; lsp:methodName "inlayHint/resolve" ; law:status law:WIRED .
+pddl:lsp_062 a pddl:LspMethod ; lsp:methodName "textDocument/inlineValue" ; law:status law:WIRED .
+pddl:lsp_063 a pddl:LspMethod ; lsp:methodName "textDocument/inlineCompletion" ; law:status law:WIRED .
+pddl:lsp_064 a pddl:LspMethod ; lsp:methodName "textDocument/diagnostic" ; law:status law:CANDIDATE .
+pddl:lsp_065 a pddl:LspMethod ; lsp:methodName "workspace/diagnostic" ; law:status law:CANDIDATE .
+pddl:lsp_066 a pddl:LspMethod ; lsp:methodName "notebookDocument/didOpen" ; law:status law:WIRED .
+pddl:lsp_067 a pddl:LspMethod ; lsp:methodName "notebookDocument/didChange" ; law:status law:WIRED .
+pddl:lsp_068 a pddl:LspMethod ; lsp:methodName "notebookDocument/didSave" ; law:status law:WIRED .
+pddl:lsp_069 a pddl:LspMethod ; lsp:methodName "notebookDocument/didClose" ; law:status law:WIRED .
+pddl:lsp_070 a pddl:LspMethod ; lsp:methodName "window/workDoneProgress/cancel" ; law:status law:WIRED .
+pddl:lsp_071 a pddl:LspMethod ; lsp:methodName "$/setTrace" ; law:status law:WIRED .
+pddl:lsp_072 a pddl:LspMethod ; lsp:methodName "$/progress" ; law:status law:WIRED .
+pddl:lsif_v_00 a pddl:LsifVertex ; rdfs:label "metaData" ; law:status law:CANDIDATE .
+pddl:lsif_v_01 a pddl:LsifVertex ; rdfs:label "source" ; law:status law:CANDIDATE .
+pddl:lsif_v_02 a pddl:LsifVertex ; rdfs:label "capabilities" ; law:status law:CANDIDATE .
+pddl:lsif_v_03 a pddl:LsifVertex ; rdfs:label "project" ; law:status law:CANDIDATE .
+pddl:lsif_v_04 a pddl:LsifVertex ; rdfs:label "document" ; law:status law:CANDIDATE .
+pddl:lsif_v_05 a pddl:LsifVertex ; rdfs:label "resultSet" ; law:status law:CANDIDATE .
+pddl:lsif_v_06 a pddl:LsifVertex ; rdfs:label "range" ; law:status law:CANDIDATE .
+pddl:lsif_v_07 a pddl:LsifVertex ; rdfs:label "resultRange" ; law:status law:CANDIDATE .
+pddl:lsif_v_08 a pddl:LsifVertex ; rdfs:label "moniker" ; law:status law:CANDIDATE .
+pddl:lsif_v_09 a pddl:LsifVertex ; rdfs:label "packageInformation" ; law:status law:CANDIDATE .
+pddl:lsif_v_10 a pddl:LsifVertex ; rdfs:label "hoverResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_11 a pddl:LsifVertex ; rdfs:label "referenceResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_12 a pddl:LsifVertex ; rdfs:label "declarationResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_13 a pddl:LsifVertex ; rdfs:label "definitionResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_14 a pddl:LsifVertex ; rdfs:label "implementationResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_15 a pddl:LsifVertex ; rdfs:label "typeDefinitionResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_16 a pddl:LsifVertex ; rdfs:label "callHierarchyResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_17 a pddl:LsifVertex ; rdfs:label "typeHierarchyResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_18 a pddl:LsifVertex ; rdfs:label "foldingRangeResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_19 a pddl:LsifVertex ; rdfs:label "documentLinkResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_20 a pddl:LsifVertex ; rdfs:label "documentSymbolResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_21 a pddl:LsifVertex ; rdfs:label "diagnosticResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_22 a pddl:LsifVertex ; rdfs:label "semanticTokensResult" ; law:status law:CANDIDATE .
+pddl:lsif_v_23 a pddl:LsifVertex ; rdfs:label "$event" ; law:status law:CANDIDATE .
+pddl:lsif_e_00 a pddl:LsifEdge ; rdfs:label "contains" ; law:status law:CANDIDATE .
+pddl:lsif_e_01 a pddl:LsifEdge ; rdfs:label "next" ; law:status law:CANDIDATE .
+pddl:lsif_e_02 a pddl:LsifEdge ; rdfs:label "moniker" ; law:status law:CANDIDATE .
+pddl:lsif_e_03 a pddl:LsifEdge ; rdfs:label "nextMoniker" ; law:status law:CANDIDATE .
+pddl:lsif_e_04 a pddl:LsifEdge ; rdfs:label "belongsTo" ; law:status law:CANDIDATE .
+pddl:lsif_e_05 a pddl:LsifEdge ; rdfs:label "attach" ; law:status law:CANDIDATE .
+pddl:lsif_e_06 a pddl:LsifEdge ; rdfs:label "packageInformation" ; law:status law:CANDIDATE .
+pddl:lsif_e_07 a pddl:LsifEdge ; rdfs:label "item" ; law:status law:CANDIDATE .
+pddl:lsif_e_08 a pddl:LsifEdge ; rdfs:label "textDocument/hover" ; law:status law:CANDIDATE .
+pddl:lsif_e_09 a pddl:LsifEdge ; rdfs:label "textDocument/definition" ; law:status law:CANDIDATE .
+pddl:lsif_e_10 a pddl:LsifEdge ; rdfs:label "textDocument/declaration" ; law:status law:CANDIDATE .
+pddl:lsif_e_11 a pddl:LsifEdge ; rdfs:label "textDocument/references" ; law:status law:CANDIDATE .
+pddl:lsif_e_12 a pddl:LsifEdge ; rdfs:label "textDocument/implementation" ; law:status law:CANDIDATE .
+pddl:lsif_e_13 a pddl:LsifEdge ; rdfs:label "textDocument/typeDefinition" ; law:status law:CANDIDATE .
+pddl:lsif_e_14 a pddl:LsifEdge ; rdfs:label "textDocument/callHierarchy" ; law:status law:CANDIDATE .
+pddl:lsif_e_15 a pddl:LsifEdge ; rdfs:label "textDocument/typeHierarchy" ; law:status law:CANDIDATE .
+pddl:lsif_e_16 a pddl:LsifEdge ; rdfs:label "textDocument/foldingRange" ; law:status law:CANDIDATE .
+pddl:lsif_e_17 a pddl:LsifEdge ; rdfs:label "textDocument/documentLink" ; law:status law:CANDIDATE .
+pddl:lsif_e_18 a pddl:LsifEdge ; rdfs:label "textDocument/documentSymbol" ; law:status law:CANDIDATE .
+pddl:lsif_e_19 a pddl:LsifEdge ; rdfs:label "textDocument/diagnostic" ; law:status law:CANDIDATE .
+pddl:lsif_e_20 a pddl:LsifEdge ; rdfs:label "textDocument/semanticTokens/full" ; law:status law:CANDIDATE .
