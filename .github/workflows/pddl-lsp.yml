@@ -27,6 +27,19 @@ jobs:
           python3 pddl-lsp/scripts/render_ontology.py --check
           python3 pddl-lsp/scripts/verify_ontology.py
       - name: Test
-        run: cargo test --manifest-path pddl-lsp/Cargo.toml --all-features
+        run: |
+          set -o pipefail
+          cargo test --manifest-path pddl-lsp/Cargo.toml --all-features 2>&1 | tee cargo-test.log
       - name: Clippy
-        run: cargo clippy --manifest-path pddl-lsp/Cargo.toml --all-targets --all-features -- -D warnings
+        run: |
+          set -o pipefail
+          cargo clippy --manifest-path pddl-lsp/Cargo.toml --all-targets --all-features -- -D warnings 2>&1 | tee cargo-clippy.log
+      - name: Upload verifier transcripts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pddl-lsp-verifier-transcripts
+          path: |
+            cargo-test.log
+            cargo-clippy.log
+          if-no-files-found: ignore
