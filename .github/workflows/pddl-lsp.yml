@@ -1,0 +1,32 @@
+name: pddl-lsp
+
+on:
+  pull_request:
+    paths:
+      - "pddl-lsp/**"
+      - ".github/workflows/pddl-lsp.yml"
+  push:
+    branches: [master]
+    paths:
+      - "pddl-lsp/**"
+      - ".github/workflows/pddl-lsp.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Verify ontology projection
+        run: |
+          python3 pddl-lsp/scripts/render_ontology.py --check
+          python3 pddl-lsp/scripts/verify_ontology.py
+      - name: Test
+        run: cargo test --manifest-path pddl-lsp/Cargo.toml --all-features
+      - name: Clippy
+        run: cargo clippy --manifest-path pddl-lsp/Cargo.toml --all-targets --all-features -- -D warnings
