@@ -106,14 +106,12 @@ impl DocumentModel {
     }
 
     pub fn offset(&self, line: u32, character: u32) -> usize {
-        let mut current_line = 0u32;
         let mut offset = 0usize;
-        for segment in self.text.split_inclusive('\n') {
-            if current_line == line {
+        for (current_line, segment) in self.text.split_inclusive('\n').enumerate() {
+            if current_line as u32 == line {
                 return offset + usize::min(character as usize, segment.trim_end_matches('\n').len());
             }
             offset += segment.len();
-            current_line += 1;
         }
         self.text.len()
     }
