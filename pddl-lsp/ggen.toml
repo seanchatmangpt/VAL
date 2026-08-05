@@ -1,0 +1,25 @@
+[project]
+name = "val-pddl-lsp"
+language_id = "pddl"
+version = "26.7.27"
+
+[ontology]
+source = "ontology/pddl-lsp.ttl"
+packs = ["lsp-max"]
+
+[generation]
+output_dir = "src/generated"
+
+[[generation.rules]]
+name = "capability-manifest"
+query = { file = "queries/capabilities.sparql" }
+template = { file = "templates/capability_manifest.rs.tera" }
+output_file = "src/generated/capability_manifest.rs"
+mode = "Overwrite"
+
+[[generation.rules]]
+name = "lsif-vocabulary"
+query = { file = "queries/lsif.sparql" }
+template = { file = "templates/lsif_vocabulary.rs.tera" }
+output_file = "src/generated/lsif_vocabulary.rs"
+mode = "Overwrite"

@@ -1,0 +1,7 @@
+PREFIX pddl: <https://val-tools.github.io/pddl-lsp/>
+PREFIX lsp: <https://lsp-max.rs/ontology/>
+PREFIX law: <https://lsp-max.rs/law/>
+SELECT ?method ?status WHERE {
+  ?capability a pddl:LspMethod ; lsp:methodName ?method ; law:status ?status .
+}
+ORDER BY ?method

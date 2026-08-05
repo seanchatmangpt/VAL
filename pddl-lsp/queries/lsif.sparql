@@ -1,0 +1,8 @@
+PREFIX pddl: <https://val-tools.github.io/pddl-lsp/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?kind ?label WHERE {
+  { ?item a pddl:LsifVertex ; rdfs:label ?label . BIND("vertex" AS ?kind) }
+  UNION
+  { ?item a pddl:LsifEdge ; rdfs:label ?label . BIND("edge" AS ?kind) }
+}
+ORDER BY ?kind ?label
