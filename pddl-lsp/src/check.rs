@@ -22,6 +22,13 @@
 //!   input). stdout still carries one JSON object with an `error` member.
 //!
 //! stdout always carries exactly one JSON document (the `--help` text aside).
+//! Input nested deeper than [`crate::parser::MAX_NESTING_DEPTH`] is refused
+//! with `PDDL_NESTING_TOO_DEEP` by the parser, so no input can overflow the
+//! stack of the recursive semantic walkers.
+//!
+//! Scope: without `--domain`, only a problem carrying an `(:htn ...)` network
+//! is resolved against a domain by name; a plain PDDL/FOND problem is judged
+//! in-document. `--domain` is applied to every input, domains included.
 
 use crate::parser::{atom, list, Span, TokenKind};
 use crate::semantic::{DocumentModel, SemanticIssue};

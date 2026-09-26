@@ -236,3 +236,110 @@ fn cli_issue_codes_equal_library_codes_on_every_fixture() {
     assert!(semantic.iter().all(|c| !c.starts_with("CLI_")), "library emitted a CLI_ code: {semantic:?}");
     assert!(compared >= names.len() * 2, "compared only {compared} runs");
 }
+
+/// A real file on disk for inputs derived from fixtures at test time.
+struct TempInput(PathBuf);
+
+impl TempInput {
+    fn new(name: &str, text: &str) -> Self {
+        let path = std::env::temp_dir().join(format!("val-pddl-check-{}-{name}", std::process::id()));
+        std::fs::write(&path, text).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+        Self(path)
+    }
+
+    fn path(&self) -> &str { self.0.to_str().expect("utf-8 temp path") }
+}
+
+impl Drop for TempInput {
+    fn drop(&mut self) { let _ = std::fs::remove_file(&self.0); }
+}
+
+fn nested(depth: usize) -> String { format!("{}{}", "(".repeat(depth), ")".repeat(depth)) }
+
+/// Falsifier for "stdout always carries exactly one JSON document": inputs
+/// nested far past any real document used to overflow the recursive parser
+/// (exit 134, empty stdout). They must be refused as JSON with exit 1.
+#[test]
+fn pathologically_deep_input_is_refused_as_json_not_a_crash() {
+    for depth in [5_000usize, 50_000, 200_000] {
+        let r = run_with_stdin(&["-"], Some(&nested(depth)));
+        assert_report_shape(&r);
+        assert_eq!(r.code, 1, "depth {depth}: {}", r.json);
+        assert!(codes(&r).iter().any(|c| c == "PDDL_NESTING_TOO_DEEP"), "depth {depth}: {:?}", codes(&r));
+    }
+    let unbalanced = run_with_stdin(&["-"], Some(&"(".repeat(200_000)));
+    assert_report_shape(&unbalanced);
+    assert_eq!(unbalanced.code, 1);
+    let c = codes(&unbalanced);
+    assert!(c.iter().any(|c| c == "PDDL_NESTING_TOO_DEEP") && c.iter().any(|c| c == "PDDL_UNCLOSED_LIST"), "{c:?}");
+}
+
+#[test]
+fn deep_precondition_in_a_real_domain_is_refused_as_json() {
+    let deep_and = format!("{}(at ?p ?l){}", "(and ".repeat(6_000), ")".repeat(6_000));
+    let domain = fixture_text("ipc-transport-domain.hddl").replacen(
+        "(:task deliver :parameters (?p - package ?l - location))",
+        &format!("(:task deliver :parameters (?p - package ?l - location))\n  (:action probe :parameters (?p - package ?l - location) :precondition {deep_and} :effect (and))"),
+        1,
+    );
+    assert_ne!(domain, fixture_text("ipc-transport-domain.hddl"), "splice point moved");
+    let r = run_with_stdin(&["-"], Some(&domain));
+    assert_report_shape(&r);
+    assert_eq!(r.code, 1, "{}", r.json);
+    assert_eq!(codes(&r), vec!["PDDL_NESTING_TOO_DEEP"]);
+    assert_eq!(r.json["files"][0]["domain_name"], "transport", "the rest of the domain is still analyzed");
+}
+
+#[test]
+fn deep_task_network_against_explicit_domain_is_refused_as_json() {
+    let problem = fixture_text("ipc-transport-problem.hddl").replacen(":ordered-subtasks (and", &format!(":ordered-subtasks (and {}", nested(100_000)), 1);
+    assert_ne!(problem, fixture_text("ipc-transport-problem.hddl"), "splice point moved");
+    let r = run_with_stdin(&["--domain", &fixture_path("ipc-transport-domain.hddl"), "-"], Some(&problem));
+    assert_report_shape(&r);
+    assert_eq!(r.code, 1, "{}", r.json);
+    assert!(codes(&r).iter().any(|c| c == "PDDL_NESTING_TOO_DEEP"), "{:?}", codes(&r));
+    assert_eq!(r.json["files"][1]["checked_against"], fixture_path("ipc-transport-domain.hddl"));
+}
+
+/// Kills the case-sensitive-resolution mutant: `(:domain TRANSPORT)` must
+/// resolve to the input declaring `(domain transport)` (ASCII case-insensitive).
+#[test]
+fn domain_name_resolution_is_ascii_case_insensitive() {
+    let upper = TempInput::new("upper-ok.hddl", &fixture_text("ipc-transport-problem.hddl").replacen("(:domain transport)", "(:domain TRANSPORT)", 1));
+    let bad = TempInput::new("upper-bad.hddl", &fixture_text("ipc-transport-problem-undeclared-task.hddl").replacen("(:domain transport)", "(:domain TRANSPORT)", 1));
+    let domain = fixture_path("ipc-transport-domain.hddl");
+    let ok = run(&[upper.path(), &domain]);
+    assert_report_shape(&ok);
+    assert_eq!(ok.code, 0, "{}", ok.json);
+    assert_eq!(ok.json["files"][0]["checked_against"], domain);
+    for args in [[bad.path(), domain.as_str()], [domain.as_str(), bad.path()]] {
+        let r = run(&args);
+        assert_report_shape(&r);
+        assert_eq!(r.code, 1, "{}", r.json);
+        assert_eq!(codes(&r), vec!["HDDL_UNDEFINED_TASK"], "{args:?}");
+    }
+}
+
+/// Pins the documented rule "--domain is used for every input": a document
+/// that declares its own domain and carries an (:htn ...) network is judged
+/// in-document AND against the explicit domain. Kills the mutant that applies
+/// --domain only to inputs lacking a domain.
+#[test]
+fn explicit_domain_also_judges_a_self_contained_htn_document() {
+    let combined = format!(
+        "{}\n(define (problem self-contained) (:domain transport) (:htn :ordered-subtasks (and (t0 (deliver p l))))) ",
+        fixture_text("ipc-transport-domain.hddl")
+    );
+    let own = TempInput::new("self-contained.hddl", &combined);
+    let alone = run(&[own.path()]);
+    assert_report_shape(&alone);
+    assert_eq!(alone.code, 0, "in-document judgement admits it: {}", alone.json);
+    assert!(alone.json["files"][0]["checked_against"].is_null());
+    let r = run(&["--domain", &fixture_path("fond-tireworld-domain.pddl"), own.path()]);
+    assert_report_shape(&r);
+    assert_eq!(r.code, 1, "{}", r.json);
+    assert_eq!(r.json["files"][1]["checked_against"], fixture_path("fond-tireworld-domain.pddl"));
+    let against: Vec<&Value> = r.json["issues"].as_array().unwrap().iter().filter(|i| i["check"] == "problem-against-domain").collect();
+    assert_eq!(against.len(), 1, "{}", r.json);
+    assert_eq!(against[0]["code"], "HDDL_UNDEFINED_TASK");
+}
