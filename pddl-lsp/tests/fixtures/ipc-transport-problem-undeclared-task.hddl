@@ -1,0 +1,22 @@
+; Negative fixture: transport problem whose (:htn ...) names an undeclared task (ship). Own composition.
+(define (problem pfile01)
+  (:domain transport)
+  (:objects
+    city-loc-0 city-loc-1 city-loc-2 - location
+    truck-0 - vehicle
+    package-0 package-1 - package)
+  (:htn
+    :parameters ()
+    :ordered-subtasks (and
+      (task0 (deliver package-0 city-loc-0))
+      (task1 (ship package-1 city-loc-2)))
+    :ordering ()
+    :constraints ())
+  (:init
+    (road city-loc-0 city-loc-1)
+    (road city-loc-1 city-loc-0)
+    (road city-loc-1 city-loc-2)
+    (road city-loc-2 city-loc-1)
+    (at package-0 city-loc-1)
+    (at package-1 city-loc-1)
+    (at truck-0 city-loc-2)))

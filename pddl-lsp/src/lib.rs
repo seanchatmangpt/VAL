@@ -3,6 +3,7 @@
 
 pub mod backend;
 pub mod capabilities;
+pub mod check;
 pub mod document;
 pub mod generated;
 pub mod lsif;
