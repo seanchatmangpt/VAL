@@ -57,6 +57,14 @@ pub struct ParseResult {
     pub issues: Vec<ParseIssue>,
 }
 
+/// Maximum list nesting depth the parser builds into the tree. Every consumer
+/// of [`SExpr`] (semantic walkers, clone, drop, serialization) recurses over
+/// the tree, so the tree depth is bounded here, once, instead of trusting input.
+/// A list opened deeper than this is refused with `PDDL_NESTING_TOO_DEEP`, its
+/// balanced extent is skipped iteratively, and an empty list stands in for it.
+/// Real PDDL/HDDL/FOND documents nest well under 64 levels.
+pub const MAX_NESTING_DEPTH: usize = 256;
+
 pub fn parse(text: &str) -> ParseResult {
     let tokens = tokenize(text);
     let mut cursor = 0usize;
@@ -68,7 +76,7 @@ pub fn parse(text: &str) -> ParseResult {
             cursor += 1;
             continue;
         }
-        match parse_expr(&tokens, &mut cursor, &mut issues) {
+        match parse_expr(&tokens, &mut cursor, &mut issues, 0) {
             Some(expr) => roots.push(expr),
             None => cursor += 1,
         }
@@ -77,7 +85,40 @@ pub fn parse(text: &str) -> ParseResult {
     ParseResult { tokens, roots, issues }
 }
 
-fn parse_expr(tokens: &[Token], cursor: &mut usize, issues: &mut Vec<ParseIssue>) -> Option<SExpr> {
+/// Skips the balanced list whose `(` is at `*cursor`, without recursion.
+/// Returns the span of the skipped extent and whether it was closed.
+fn skip_list(tokens: &[Token], cursor: &mut usize) -> (Span, bool) {
+    let start = tokens[*cursor].span;
+    let mut open = 0usize;
+    while *cursor < tokens.len() {
+        let token = &tokens[*cursor];
+        *cursor += 1;
+        match token.kind {
+            TokenKind::LeftParen => open += 1,
+            TokenKind::RightParen => {
+                open -= 1;
+                if open == 0 {
+                    let end = token.span;
+                    return (
+                        Span {
+                            start: start.start,
+                            end: end.end,
+                            start_line: start.start_line,
+                            start_character: start.start_character,
+                            end_line: end.end_line,
+                            end_character: end.end_character,
+                        },
+                        true,
+                    );
+                }
+            }
+            TokenKind::Atom | TokenKind::Comment => {}
+        }
+    }
+    (start, false)
+}
+
+fn parse_expr(tokens: &[Token], cursor: &mut usize, issues: &mut Vec<ParseIssue>, depth: usize) -> Option<SExpr> {
     let token = tokens.get(*cursor)?.clone();
     match token.kind {
         TokenKind::Atom => {
@@ -95,6 +136,22 @@ fn parse_expr(tokens: &[Token], cursor: &mut usize, issues: &mut Vec<ParseIssue>
                 span: token.span,
             });
             None
+        }
+        TokenKind::LeftParen if depth >= MAX_NESTING_DEPTH => {
+            let (span, closed) = skip_list(tokens, cursor);
+            issues.push(ParseIssue {
+                code: "PDDL_NESTING_TOO_DEEP",
+                message: format!("list nesting exceeds {MAX_NESTING_DEPTH} levels; the nested form was not analyzed"),
+                span,
+            });
+            if !closed {
+                issues.push(ParseIssue {
+                    code: "PDDL_UNCLOSED_LIST",
+                    message: "list opened here is never closed".to_string(),
+                    span,
+                });
+            }
+            Some(SExpr { kind: SExprKind::List(Vec::new()), span })
         }
         TokenKind::LeftParen => {
             *cursor += 1;
@@ -119,7 +176,7 @@ fn parse_expr(tokens: &[Token], cursor: &mut usize, issues: &mut Vec<ParseIssue>
                     }
                     TokenKind::Comment => *cursor += 1,
                     _ => {
-                        if let Some(expr) = parse_expr(tokens, cursor, issues) {
+                        if let Some(expr) = parse_expr(tokens, cursor, issues, depth + 1) {
                             children.push(expr);
                         }
                     }
@@ -236,6 +293,55 @@ mod tests {
         let result = parse("(define (domain logistics) (:predicates (at ?x)))");
         assert!(result.issues.is_empty());
         assert_eq!(result.roots.len(), 1);
+    }
+
+    fn nested(depth: usize) -> String { format!("{}{}", "(".repeat(depth), ")".repeat(depth)) }
+
+    fn tree_depth(expr: &SExpr) -> usize {
+        // Iterative so the measurement itself cannot overflow.
+        let mut max = 0;
+        let mut stack = vec![(expr, 1usize)];
+        while let Some((e, d)) = stack.pop() {
+            max = max.max(d);
+            if let SExprKind::List(items) = &e.kind { stack.extend(items.iter().map(|c| (c, d + 1))); }
+        }
+        max
+    }
+
+    #[test]
+    fn nesting_at_the_bound_is_admitted() {
+        let result = parse(&nested(MAX_NESTING_DEPTH));
+        assert!(result.issues.is_empty(), "{:?}", result.issues);
+        assert_eq!(tree_depth(&result.roots[0]), MAX_NESTING_DEPTH);
+    }
+
+    #[test]
+    fn nesting_past_the_bound_is_refused_and_tree_depth_is_bounded() {
+        for depth in [MAX_NESTING_DEPTH + 1, 5_000, 200_000] {
+            let result = parse(&nested(depth));
+            let deep: Vec<_> = result.issues.iter().filter(|i| i.code == "PDDL_NESTING_TOO_DEEP").collect();
+            assert_eq!(deep.len(), 1, "depth {depth}: {:?}", result.issues);
+            assert!(!result.issues.iter().any(|i| i.code == "PDDL_UNCLOSED_LIST"), "depth {depth} is balanced");
+            assert_eq!(result.roots.len(), 1);
+            assert_eq!(tree_depth(&result.roots[0]), MAX_NESTING_DEPTH + 1);
+        }
+    }
+
+    #[test]
+    fn unbalanced_deep_input_is_refused_as_too_deep_and_unclosed() {
+        let result = parse(&"(".repeat(200_000));
+        assert!(result.issues.iter().any(|i| i.code == "PDDL_NESTING_TOO_DEEP"));
+        assert!(result.issues.iter().any(|i| i.code == "PDDL_UNCLOSED_LIST"));
+    }
+
+    #[test]
+    fn parsing_resumes_after_a_skipped_deep_form() {
+        let text = format!("(define (domain d) {} (:predicates (at ?x)))", nested(MAX_NESTING_DEPTH + 10));
+        let result = parse(&text);
+        assert_eq!(result.issues.iter().filter(|i| i.code == "PDDL_NESTING_TOO_DEEP").count(), 1);
+        assert_eq!(result.roots.len(), 1);
+        let SExprKind::List(items) = &result.roots[0].kind else { panic!("root is a list") };
+        assert_eq!(items.len(), 4, "define, (domain d), skipped form, (:predicates ...)");
     }
 
     #[test]

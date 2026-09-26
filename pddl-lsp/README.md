@@ -30,6 +30,31 @@ FOND `oneof` tireworld domain (zero issues), and a SHOP-shaped `(defproblem ...)
 mirroring ggen_igniter `semantic-jira-pack/templates/plan.hddl.eex` output, which is refused
 with `PDDL_DEFINE_REQUIRED` plus `HDDL_UNDEFINED_TASK` for its undeclared tasks.
 
+## Subprocess oracle: `val-pddl-check`
+
+A non-LSP binary over the same court, for callers that cannot hold an LSP session
+(ash_pplan, ferroplan, beam4pm, wasm4pm-powl-to-hddl). Logic lives in `src/check.rs`.
+
+```bash
+cargo +nightly run --manifest-path pddl-lsp/Cargo.toml --bin val-pddl-check -- \
+  --domain pddl-lsp/tests/fixtures/ipc-transport-domain.hddl \
+  pddl-lsp/tests/fixtures/ipc-transport-problem.hddl
+```
+
+- `val-pddl-check [--domain DOMAIN_FILE] FILE...`; `FILE` may be `-` for stdin.
+- stdout is one JSON object (`schema: "val-pddl-check/v1"`): `admitted`, `files[]`
+  (`path`, `role`, `domain_name`, `problem_name`, `checked_against`, `issue_count`) and
+  `issues[]` (`file`, `check`, `code`, `message`, `span`, `severity`).
+- Exit `0` = admitted (zero issues), `1` = refused (any issue), `2` = usage/I-O error
+  (JSON `error` object with `CLI_USAGE` or `CLI_IO_ERROR`).
+- Every input gets `DocumentModel::analyze` (`check: "document"`). A problem's `(:htn ...)`
+  network is checked with `check_problem_against_domain` (`check: "problem-against-domain"`)
+  against `--domain`, else against an input declaring the problem's `(:domain X)`; if neither
+  resolves, it is refused with `CLI_DOMAIN_UNRESOLVED` (`check: "domain-resolution"`) rather
+  than admitted unjudged.
+- `tests/check_cli.rs` spawns the built binary on every fixture and asserts its issue codes
+  equal the library court's, alone and against every domain fixture.
+
 ## Verify
 
 ```bash
