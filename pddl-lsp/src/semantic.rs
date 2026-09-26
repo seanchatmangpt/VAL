@@ -9,6 +9,7 @@ pub const REQUIREMENTS: &[&str] = &[
     ":adl", ":durative-actions", ":duration-inequalities", ":continuous-effects",
     ":derived-predicates", ":timed-initial-literals", ":preferences", ":constraints",
     ":action-costs", ":goal-utilities", ":method-preconditions", ":hierarchy",
+    ":non-deterministic",
 ];
 
 pub const KEYWORDS: &[&str] = &[
@@ -16,6 +17,7 @@ pub const KEYWORDS: &[&str] = &[
     ":predicates", ":functions", ":action", ":durative-action", ":parameters",
     ":precondition", ":condition", ":effect", ":duration", ":derived", ":objects",
     ":init", ":goal", ":metric", ":constraints", ":method", ":task", ":tasks",
+    ":ordered-tasks", ":htn", ":subtasks", ":ordered-subtasks", ":ordering", "oneof", "<",
     "and", "or", "not", "imply", "exists", "forall", "when", "assign", "increase",
     "decrease", "scale-up", "scale-down", "at", "over", "start", "end", "all",
 ];
@@ -32,6 +34,7 @@ pub enum SymbolKind {
     Function,
     Action,
     Method,
+    Task,
     Parameter,
 }
 
@@ -136,6 +139,7 @@ impl DocumentModel {
                 for child in items.iter().skip(2) { self.walk(child, Some(&name)); }
                 return;
             }
+            ":task" if items.len() > 1 && atom(&items[1]).is_some() => self.add_named(&items[1], SymbolKind::Task, container, Some(signature(items))),
             ":method" if items.len() > 1 => self.add_named(&items[1], SymbolKind::Method, container, Some(signature(items))),
             ":predicates" => {
                 for child in items.iter().skip(1) {
@@ -172,8 +176,13 @@ impl DocumentModel {
         self.symbols.push(Symbol { name: name.to_string(), normalized: normalize(name), kind, span: expr.span, container: container.map(str::to_string), signature });
     }
 
+    /// Indexes the declared names of a typed list (`a b - t c`). The atom after
+    /// `-` is a supertype *reference*, not a declaration, and is not indexed.
     fn add_flat(&mut self, items: &[SExpr], kind: SymbolKind, container: Option<&str>) {
+        let mut after_dash = false;
         for item in items.iter().skip(1) {
+            let is_supertype = std::mem::replace(&mut after_dash, atom(item) == Some("-"));
+            if is_supertype { continue; }
             let Some(value) = atom(item) else { continue; };
             if value == "-" || value.starts_with(':') { continue; }
             self.symbols.push(Symbol { name: value.to_string(), normalized: normalize(value), kind, span: item.span, container: container.map(str::to_string), signature: None });
@@ -217,6 +226,62 @@ impl DocumentModel {
                 self.issues.push(SemanticIssue { code: "PDDL_DUPLICATE_SYMBOL", message: format!("duplicate {:?} '{}'", symbol.kind, symbol.name), span: symbol.span, severity: 1 });
             }
         }
+        self.collect_hddl_issues();
+        self.collect_fond_issues();
+    }
+
+    /// Declared arity of every task (`SymbolKind::Task`) and primitive action,
+    /// keyed by normalized name. Arity = number of `?variables` in `:parameters`.
+    pub fn operator_arities(&self) -> BTreeMap<String, (SymbolKind, usize)> {
+        let mut arities = BTreeMap::new();
+        for root in &self.parse.roots { collect_operator_arities(root, &mut arities); }
+        arities
+    }
+
+    /// HDDL reference court over methods declared in this document: a method's
+    /// `:task` must name a declared compound task with matching arity, and every
+    /// subtask must name a declared task or primitive action with matching arity.
+    /// Problem-level `(:htn ...)` networks are checked only when the same
+    /// document declares a domain; cross-file problems use [`Self::check_problem_against_domain`].
+    fn collect_hddl_issues(&mut self) {
+        let arities = self.operator_arities();
+        let declares_domain = self.domain_name.is_some();
+        let mut issues = Vec::new();
+        for root in &self.parse.roots {
+            visit_lists(root, &mut |items| {
+                match head(items).as_deref() {
+                    Some(":method") => check_method(items, &arities, &mut issues),
+                    Some(":htn") if declares_domain => {
+                        for task in network_tasks(items) { check_task_reference(task, &arities, "subtask", &mut issues); }
+                    }
+                    _ => {}
+                }
+            });
+        }
+        self.issues.extend(issues);
+    }
+
+    /// FOND court: `oneof` is a non-deterministic *effect* and is admitted only
+    /// inside the value of an action's `:effect`.
+    fn collect_fond_issues(&mut self) {
+        let mut issues = Vec::new();
+        for root in &self.parse.roots { check_oneof(root, false, &mut issues); }
+        self.issues.extend(issues);
+    }
+
+    /// Checks this document's problem-level `(:htn ...)` task network against
+    /// the tasks and actions declared by a separately analyzed domain document.
+    pub fn check_problem_against_domain(&self, domain: &DocumentModel) -> Vec<SemanticIssue> {
+        let arities = domain.operator_arities();
+        let mut issues = Vec::new();
+        for root in &self.parse.roots {
+            visit_lists(root, &mut |items| {
+                if head(items).as_deref() == Some(":htn") {
+                    for task in network_tasks(items) { check_task_reference(task, &arities, "subtask", &mut issues); }
+                }
+            });
+        }
+        issues
     }
 
     pub fn completion_words(&self) -> Vec<String> {
@@ -233,6 +298,125 @@ fn signature(items: &[SExpr]) -> String {
 
 fn normalize(value: &str) -> String { value.to_ascii_lowercase() }
 
+fn head(items: &[SExpr]) -> Option<String> { items.first().and_then(atom).map(normalize) }
+
+/// Pre-order visit of every list node.
+fn visit_lists(expr: &SExpr, f: &mut dyn FnMut(&[SExpr])) {
+    let Some(items) = list(expr) else { return; };
+    f(items);
+    for child in items { visit_lists(child, f); }
+}
+
+/// Value following a `:keyword` inside a list (e.g. `:parameters (...)`).
+fn keyword_value<'a>(items: &'a [SExpr], keyword: &str) -> Option<&'a SExpr> {
+    items.iter().position(|item| atom(item).map(normalize).as_deref() == Some(keyword)).and_then(|i| items.get(i + 1))
+}
+
+fn parameter_count(items: &[SExpr]) -> usize {
+    keyword_value(items, ":parameters")
+        .and_then(list)
+        .map(|params| params.iter().filter_map(atom).filter(|v| v.starts_with('?')).count())
+        .unwrap_or(0)
+}
+
+fn collect_operator_arities(expr: &SExpr, arities: &mut BTreeMap<String, (SymbolKind, usize)>) {
+    let Some(items) = list(expr) else { return; };
+    let kind = match head(items).as_deref() {
+        Some(":task") => Some(SymbolKind::Task),
+        Some(":action") | Some(":durative-action") => Some(SymbolKind::Action),
+        _ => None,
+    };
+    if let (Some(kind), Some(name)) = (kind, items.get(1).and_then(atom)) {
+        arities.entry(normalize(name)).or_insert((kind, parameter_count(items)));
+        return;
+    }
+    for child in items { collect_operator_arities(child, arities); }
+}
+
+/// Task atoms of a task network value: `(and (t1 (a ?x)) (b ?y))`, a single
+/// `(t1 (a ?x))`, a single `(a ?x)`, `()`, or a SHOP-style bare sequence.
+fn network_entries(value: &SExpr) -> Vec<&SExpr> {
+    let Some(items) = list(value) else { return Vec::new(); };
+    if items.is_empty() { return Vec::new(); }
+    if head(items).as_deref() == Some("and") {
+        return items.iter().skip(1).filter_map(network_entry).collect();
+    }
+    // SHOP-style bare sequence `((a ?x) (b ?y))`: accepted so its references are still checked.
+    if list(&items[0]).is_some() {
+        return items.iter().filter_map(network_entry).collect();
+    }
+    network_entry(value).into_iter().collect()
+}
+
+fn network_entry(entry: &SExpr) -> Option<&SExpr> {
+    let items = list(entry)?;
+    match items {
+        [label, task] if atom(label).is_some() && list(task).is_some() => Some(task),
+        [first, ..] if atom(first).is_some() => Some(entry),
+        _ => None,
+    }
+}
+
+fn network_tasks(items: &[SExpr]) -> Vec<&SExpr> {
+    const NETWORK_KEYWORDS: &[&str] = &[":subtasks", ":ordered-subtasks", ":tasks", ":ordered-tasks"];
+    let mut tasks = Vec::new();
+    for (i, item) in items.iter().enumerate() {
+        if atom(item).map(normalize).is_some_and(|k| NETWORK_KEYWORDS.contains(&k.as_str())) {
+            if let Some(value) = items.get(i + 1) { tasks.extend(network_entries(value)); }
+        }
+    }
+    tasks
+}
+
+fn check_method(items: &[SExpr], arities: &BTreeMap<String, (SymbolKind, usize)>, issues: &mut Vec<SemanticIssue>) {
+    let method = items.get(1).and_then(atom).unwrap_or("<anonymous>").to_string();
+    if let Some(task) = keyword_value(items, ":task") {
+        match list(task).and_then(|parts| parts.first().and_then(atom).map(|name| (name, parts.len() - 1))) {
+            None => issues.push(SemanticIssue { code: "HDDL_UNDEFINED_TASK", message: format!("method '{method}' :task must be a task atom '(name args...)'"), span: task.span, severity: 1 }),
+            Some((name, given)) => match arities.get(&normalize(name)) {
+                Some((SymbolKind::Task, declared)) if *declared != given => issues.push(SemanticIssue {
+                    code: "HDDL_METHOD_ARITY_MISMATCH",
+                    message: format!("method '{method}' decomposes '{name}' with {given} argument(s); task declares {declared}"),
+                    span: task.span,
+                    severity: 1,
+                }),
+                Some((SymbolKind::Task, _)) => {}
+                Some(_) => issues.push(SemanticIssue { code: "HDDL_UNDEFINED_TASK", message: format!("method '{method}' :task '{name}' names a primitive action; methods decompose declared compound tasks"), span: task.span, severity: 1 }),
+                None => issues.push(SemanticIssue { code: "HDDL_UNDEFINED_TASK", message: format!("method '{method}' :task '{name}' names no declared task"), span: task.span, severity: 1 }),
+            },
+        }
+    }
+    for task in network_tasks(items) { check_task_reference(task, arities, "subtask", issues); }
+}
+
+fn check_task_reference(task: &SExpr, arities: &BTreeMap<String, (SymbolKind, usize)>, role: &str, issues: &mut Vec<SemanticIssue>) {
+    let Some(parts) = list(task) else { return; };
+    let Some(name) = parts.first().and_then(atom) else { return; };
+    let given = parts.len() - 1;
+    match arities.get(&normalize(name)) {
+        None => issues.push(SemanticIssue { code: "HDDL_UNDEFINED_TASK", message: format!("{role} '{name}' names no declared task or action"), span: task.span, severity: 1 }),
+        Some((kind, declared)) if *declared != given => issues.push(SemanticIssue {
+            code: "HDDL_SUBTASK_ARITY_MISMATCH",
+            message: format!("{role} '{name}' has {given} argument(s); {} declares {declared}", if *kind == SymbolKind::Task { "task" } else { "action" }),
+            span: task.span,
+            severity: 1,
+        }),
+        Some(_) => {}
+    }
+}
+
+fn check_oneof(expr: &SExpr, in_effect: bool, issues: &mut Vec<SemanticIssue>) {
+    let Some(items) = list(expr) else { return; };
+    if head(items).as_deref() == Some("oneof") && !in_effect {
+        issues.push(SemanticIssue { code: "FOND_ONEOF_OUTSIDE_EFFECT", message: "'oneof' is a non-deterministic effect and is only admitted inside an action :effect".to_string(), span: expr.span, severity: 1 });
+    }
+    let mut effect_value = false;
+    for item in items {
+        check_oneof(item, in_effect || effect_value, issues);
+        effect_value = atom(item).map(normalize).as_deref() == Some(":effect");
+    }
+}
+
 fn zero_span() -> Span { Span { start: 0, end: 0, start_line: 0, start_character: 0, end_line: 0, end_character: 0 } }
 
 #[cfg(test)]
@@ -245,6 +429,14 @@ mod tests {
         assert!(model.symbols.iter().any(|s| s.kind == SymbolKind::Domain && s.name == "d"));
         assert!(model.symbols.iter().any(|s| s.kind == SymbolKind::Predicate && s.name == "at"));
         assert!(model.symbols.iter().any(|s| s.kind == SymbolKind::Action && s.name == "move"));
+    }
+
+    #[test]
+    fn typed_list_supertype_is_a_reference_not_a_declaration() {
+        let model = DocumentModel::analyze("(define (domain d) (:types location locatable - object vehicle package - locatable))");
+        assert!(model.issues.is_empty(), "{:?}", model.issues);
+        let types: Vec<&str> = model.symbols.iter().filter(|s| s.kind == SymbolKind::Type).map(|s| s.name.as_str()).collect();
+        assert_eq!(types, vec!["location", "locatable", "vehicle", "package"]);
     }
 
     #[test]

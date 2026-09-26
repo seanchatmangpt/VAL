@@ -136,7 +136,7 @@ impl LanguageServer for Backend {
         let symbols = model.symbols.iter().filter(|symbol| symbol.kind != SymbolKind::Parameter).map(|symbol| json!({
             "name": symbol.name,
             "detail": symbol.signature,
-            "kind": match symbol.kind { SymbolKind::Domain | SymbolKind::Problem => 2, SymbolKind::Type => 5, SymbolKind::Predicate | SymbolKind::Function => 12, SymbolKind::Action | SymbolKind::Method => 6, _ => 13 },
+            "kind": match symbol.kind { SymbolKind::Domain | SymbolKind::Problem => 2, SymbolKind::Type => 5, SymbolKind::Predicate | SymbolKind::Function => 12, SymbolKind::Action | SymbolKind::Method | SymbolKind::Task => 6, _ => 13 },
             "range": range_json(symbol.span),
             "selectionRange": range_json(symbol.span),
             "children": []

@@ -1,0 +1,61 @@
+; IPC 2020 HTN-track-shaped total-order transport domain (own composition).
+(define (domain transport)
+  (:requirements :negative-preconditions :hierarchy :typing :method-preconditions)
+  (:types
+    location target locatable - object
+    vehicle package - locatable)
+  (:predicates
+    (road ?l1 ?l2 - location)
+    (at ?x - locatable ?l - location)
+    (in ?p - package ?v - vehicle))
+
+  (:task deliver :parameters (?p - package ?l - location))
+  (:task get-to :parameters (?v - vehicle ?l - location))
+  (:task load :parameters (?v - vehicle ?l - location ?p - package))
+  (:task unload :parameters (?v - vehicle ?l - location ?p - package))
+
+  (:method m-deliver
+    :parameters (?p - package ?l1 ?l2 - location ?v - vehicle)
+    :task (deliver ?p ?l2)
+    :ordered-subtasks (and
+      (t1 (get-to ?v ?l1))
+      (t2 (load ?v ?l1 ?p))
+      (t3 (get-to ?v ?l2))
+      (t4 (unload ?v ?l2 ?p))))
+
+  (:method m-get-to-noop
+    :parameters (?v - vehicle ?l - location)
+    :task (get-to ?v ?l)
+    :precondition (at ?v ?l)
+    :ordered-subtasks ())
+
+  (:method m-get-to-drive
+    :parameters (?v - vehicle ?l1 ?l2 - location)
+    :task (get-to ?v ?l2)
+    :subtasks (drive ?v ?l1 ?l2))
+
+  (:method m-load
+    :parameters (?v - vehicle ?l - location ?p - package)
+    :task (load ?v ?l ?p)
+    :subtasks (t1 (pick-up ?v ?l ?p)))
+
+  (:method m-unload
+    :parameters (?v - vehicle ?l - location ?p - package)
+    :task (unload ?v ?l ?p)
+    :subtasks (and (t1 (drop ?v ?l ?p)))
+    :ordering ())
+
+  (:action drive
+    :parameters (?v - vehicle ?l1 ?l2 - location)
+    :precondition (and (at ?v ?l1) (road ?l1 ?l2))
+    :effect (and (not (at ?v ?l1)) (at ?v ?l2)))
+
+  (:action pick-up
+    :parameters (?v - vehicle ?l - location ?p - package)
+    :precondition (and (at ?v ?l) (at ?p ?l))
+    :effect (and (not (at ?p ?l)) (in ?p ?v)))
+
+  (:action drop
+    :parameters (?v - vehicle ?l - location ?p - package)
+    :precondition (and (at ?v ?l) (in ?p ?v))
+    :effect (and (not (in ?p ?v)) (at ?p ?l))))

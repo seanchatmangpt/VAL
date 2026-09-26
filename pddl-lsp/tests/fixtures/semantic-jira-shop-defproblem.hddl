@@ -1,0 +1,29 @@
+;; Shape of ggen_igniter priv/ggen/semantic-jira-pack/templates/plan.hddl.eex output
+;; (origin/main): a SHOP-style (defproblem ...) form, not an HDDL (define ...) form.
+
+(defproblem promote-SJ-001 semantic-jira-workorder
+  (:objects
+    SJ-001 - workorder
+    chicago-court - court
+    test-receipt - evidence
+    revert-mutation - falsifier
+    crown - checkpoint)
+  (:task (promote SJ-001 ALIVE))
+  (:method decompose-promote-SJ-001
+    :task (promote SJ-001 ALIVE)
+    :subtasks (
+      ;; required courts - sj:requiresCourt - stable-key order
+      (close-court SJ-001 chicago-court)
+      ;; required evidence - sj:requiresEvidence - stable-key order
+      (produce-evidence SJ-001 test-receipt)
+      ;; falsifiers to discharge - sj:falsifier - stable-key order
+      (discharge-falsifier SJ-001 revert-mutation)
+      ;; terminal checkpoint - sj:nextCheckpoint
+      (reach-checkpoint SJ-001 crown)
+      ))
+  (:init
+    (workorder SJ-001)
+    (standing SJ-001 UNKNOWN)
+    (projection-authority NONE))
+  ;; Declared goal, not observed standing: ALIVE with the receipt crown.
+  (:goal (and (standing SJ-001 ALIVE) (has-receipt SJ-001))))
